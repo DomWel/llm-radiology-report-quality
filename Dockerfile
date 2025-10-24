@@ -10,10 +10,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN ls
-
 RUN pip install flask
 RUN pip install requests
-
 
 CMD ["python", "app.py"]
