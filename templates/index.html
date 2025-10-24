@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rektum Befundkorrektor</title>
+  <style>
+    body {
+      font-family: "Times New Roman", Times, serif;
+      margin: 20px;
+      background-color: #f4f4f4;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    form {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      resize: vertical;
+      font-size: 16px;
+      font-family: "Times New Roman", Times, serif;
+      spellcheck: false;
+    }
+
+    button {
+      background-color: #007bff;
+      color: white;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:disabled {
+      background-color: #999;
+      cursor: not-allowed;
+    }
+
+    #loading {
+      font-weight: bold;
+      padding: 10px;
+      color: #555;
+    }
+
+    #results {
+      display: grid;
+      grid-template-areas:
+        "T N"
+        "EMVI MRF";
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    #box-T { grid-area: T; }
+    #box-N { grid-area: N; }
+    #box-EMVI { grid-area: EMVI; }
+    #box-MRF { grid-area: MRF; }
+
+    .result-box {
+      padding: 12px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      font-family: "Times New Roman", Times, serif;
+      font-size: 16px;
+    }
+
+    .good {
+      background-color: #c8e6c9;
+    }
+
+    .medium {
+      background-color: #fff9c4;
+    }
+
+    .bad {
+      background-color: #ffcdd2;
+    }
+
+    .result-box label {
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .result-content {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .result-text {
+      flex: 1;
+      max-height: 150px;
+      overflow-y: auto;
+      font-size: 16px;
+    }
+
+    .result-text {
+      white-space: normal;         /* not pre or pre-wrap */
+      text-indent: 0 !important;   /* force reset any inherited indent */
+      margin: 0;
+      padding: 0;
+      overflow-y: auto;
+      font-size: 16px;
+      max-height: 150px;
+      
+    }
+
+    .result-button {
+      flex: 0 0 auto;
+    }
+
+    .result-text::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .result-text::-webkit-scrollbar-thumb {
+      background-color: #aaa;
+      border-radius: 4px;
+    }
+
+
+  </style>
+</head>
+<body>
+  <h1>Rektum Befundkorrektor</h1>
+
+  <form onsubmit="event.preventDefault(); runAssessment();">
+    <label for="input_text">Befundtext:</label>
+    <textarea id="input_text" name="input_text" rows="10" spellcheck="false"></textarea>
+
+    <div style="display: flex; gap: 10px; margin-top: 10px;">
+      <button id="submit-btn" type="submit">Bewerten</button>
+      <button id="send-btn" type="button" disabled>Abschicken</button>
+    </div>
+  </form>
+
+  <div id="loading" style="display: none;">Analyse läuft… bitte warten.</div>
+  <div id="results"></div>
+
+  <script>
+    function setAllButtonsDisabled(disabled) {
+      const buttons = document.querySelectorAll("button");
+      buttons.forEach(btn => btn.disabled = disabled);
+    }
+
+    function enableSendButton() {
+      document.getElementById("send-btn").disabled = false;
+    }
+
+    async function runAssessment() {
+      const inputText = document.getElementById("input_text").value;
+      const stages = ["T", "N", "EMVI", "MRF"];
+      const resultsContainer = document.getElementById("results");
+      const loadingIndicator = document.getElementById("loading");
+
+      enableSendButton();
+      resultsContainer.innerHTML = "";
+      loadingIndicator.style.display = "block";
+      setAllButtonsDisabled(true);
+
+      // Save once when "Bewerten" is clicked
+      if (inputText.trim()) {
+        await fetch("/save", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ text: inputText })
+        });
+      }
+
+      for (const stage of stages) {
+        await evaluateStage(stage, inputText);
+      }
+
+      loadingIndicator.style.display = "none";
+      setAllButtonsDisabled(false);
+    }
+
+	async function evaluateStage(stage, text) {
+	  // 1) loadingIndicator hier definieren, damit es in catch/finally auch existiert
+	  const loadingIndicator = document.getElementById("loading");
+
+	  try {
+	    enableSendButton();
+	    loadingIndicator.style.display = "block";
+	    setAllButtonsDisabled(true);
+
+	    const response = await fetch(`/evaluate/${stage}`, {
+	      method: "POST",
+	      headers: { "Content-Type": "application/json" },
+	      body: JSON.stringify({ text: text })
+	    });
+	    const data = await response.json();
+
+	    if (!data || !data.text) {
+	      console.error("data.text fehlt:", data);
+	      return;
+	    }
+
+	    // Alte Box entfernen
+	    const existingBox = document.getElementById(`box-${stage}`);
+	    if (existingBox) existingBox.remove();
+
+	    // Neue Box anlegen
+	    const box = document.createElement("div");
+	    box.id = `box-${stage}`;
+	    box.className = `result-box ${data.status}`;
+		box.innerHTML = `
+		  <label><strong>${stage}-Assessment:</strong></label>
+		  <div class="result-content">
+		            <div class="result-text">
+		              ${data.text.trimStart()}
+		            </div>
+		    <div class="result-button">
+		      <button onclick="evaluateStage('${stage}', document.getElementById('input_text').value)">Neu bewerten</button>
+		    </div>
+		  </div>
+		`;
+
+	    document.getElementById("results").appendChild(box);
+
+	  } catch (err) {
+	    console.error("Fehler in evaluateStage:", err);
+	    alert("Ein Fehler ist aufgetreten – bitte Konsole prüfen.");
+	  } finally {
+	    // 2) Immer verstecken / Buttons wieder aktivieren
+	    loadingIndicator.style.display = "none";
+	    setAllButtonsDisabled(false);
+	  }
+	}
+
+
+    document.getElementById("send-btn").addEventListener("click", async () => {
+      const inputText = document.getElementById("input_text").value;
+      if (!inputText.trim()) {
+        alert("Bitte zuerst einen Text eingeben.");
+        return;
+      }
+
+      const response = await fetch("/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ text: inputText })
+      });
+
+      const result = await response.json();
+      if (result.status === "saved") {
+        alert("Text wurde erfolgreich gespeichert.");
+      } else {
+        alert("Fehler beim Speichern.");
+      }
+
+    });
+  </script>
+</body>
+</html>

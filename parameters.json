@@ -1,0 +1,11 @@
+{
+    "temperature": 0.3, 
+    "top_p": 0.95,
+    "repeat_penalty": 1.0,
+    "N": 5,
+    "staging_parameters": ["T", "N", "EMVI", "MRF"],
+    "T_cutoff": [1.8, 3.8],
+    "N_cutoff": [6.2, 8.2], 
+    "MRF_cutoff": [2.6, 4.6],
+    "EMVI_cutoff": [4.4, 6.4] 
+}
