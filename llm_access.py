@@ -13,7 +13,7 @@ def ask_ollama(question, parameters):
         "messages": [
             {
                 "role": "user",
-                "content": question + " Bitte antworte ausschließlich im JSON-Format mit den Feldern: answer.",
+                "content": question + " Bitte antworte ausschließlich im JSON-Format mit den Feldern: question, answer, sources.",
             }
         ],
         "stream": False,
